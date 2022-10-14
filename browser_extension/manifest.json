@@ -1,0 +1,16 @@
+{
+  "manifest_version": 2,
+  "name": "Hacking helper",
+  "version": "0.0.1",
+  "description": "Helps you search for bugs in websites more efficiently.",
+  "content_scripts": [
+    {
+      "matches": ["https://*/*"],
+      "js": ["harness.js"]
+    },
+    {
+      "matches": ["http://*/*"],
+      "js": ["harness.js"]
+    }
+  ]
+}
