@@ -3,8 +3,10 @@ import dataclasses
 import argparse
 import os
 import sys
+import dns.resolver
 
 from bs4 import BeautifulSoup
+from rich.progress import track
 
 """ Types """
 
@@ -116,6 +118,35 @@ def check_webarchive(domain: str):
     subdomains.remove("")
   return subdomains
 
+def check_bruteforce(domain: str):
+  resolver = dns.resolver.Resolver()
+  resolver.timeout = 0.5
+
+  with open("common_subdomains.txt", "r") as subdomain_file:
+    subdomain_list = [subdomain.strip() for subdomain in subdomain_file.read().split()]
+
+  types = ["A", "AAAA", "CNAME", "DNSKEY", "MX", "TXT"]
+  subdomains = []
+
+  # TODO: This can probably be optimised to avoid the need for so many repeated dns requests?
+  for subdomain in track(subdomain_list, description="Bruteforcing"):
+    subdomain = f"{subdomain}.{domain}"
+    try:
+      for query_type in types:
+        resolver.resolve(subdomain, query_type)
+        subdomains.append(subdomain)
+        break
+    except dns.resolver.NXDOMAIN:
+      pass
+    except dns.resolver.NoAnswer: # doesn't work for cloudflare domains
+      subdomains.append(subdomain)
+    except KeyboardInterrupt:
+      exit(1)
+    except:
+      pass
+
+  return subdomains
+
 services = [
   ("otx.alienvault.com", check_alienvault),
   ("api.certspotter.com", check_certspotter),
@@ -134,11 +165,15 @@ if __name__ == "__main__":
   parser.add_argument("domains", type=str, nargs="+", help="the domain to enumerate subdomains of")
   parser.add_argument("--include-domain", action="store_true", help="include the original domain in the list of subdomains")
   parser.add_argument("-o", "--output-dir", type=str, help="directory to save subdomain lists to")
+  parser.add_argument("-b", "--bruteforce", action="store_true", help="enable the bruteforce service")
   args = parser.parse_args()
 
   domains = args.domains
   include_domain = args.include_domain
   output_dir = args.output_dir
+
+  if args.bruteforce:
+    services.append(("bruteforce", check_bruteforce))
 
   if output_dir != None:
     if os.path.isdir(output_dir):
@@ -156,7 +191,10 @@ if __name__ == "__main__":
 
     for (name, service) in services:
       try:
-        print(f"  [*] Searching '{name}'")
+        if name == "bruteforce":
+          print(f"  [*] Bruteforcing to search for missed subdomains")
+        else:
+          print(f"  [*] Searching '{name}'")
         count_before = len(subdomains)
         subdomains.update(service(domain))
         count_after = len(subdomains)
@@ -164,7 +202,7 @@ if __name__ == "__main__":
         print(f"  [*] Found {count} new subdomains")
       except KeyboardInterrupt as e:
         exit(1)
-      except:
+      except Exception as e:
         print(f"  [-] Failed to search '{name}'")
 
     count = len(subdomains)
@@ -184,3 +222,4 @@ if __name__ == "__main__":
 
   count = len(domains)
   print(f"[*] Finished enumerating {count} domains and found {sub_count} subdomains in total")
+
