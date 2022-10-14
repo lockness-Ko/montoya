@@ -1,3 +1,3 @@
 import os
 
-os.system("mitmweb -s prettify_js.py")
+os.system("mitmweb -s proxy_addons/prettify_js.py")
