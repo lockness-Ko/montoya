@@ -7,5 +7,10 @@
     <p>Because I obfuscated the JS</p>
     <button id="button">Click me!</button>
     <script src="/static/index.js"></script>
+
+    <form action="xssable" method="GET">
+      <input name="input" placeholder="Give me some input..."/>
+      <button type="submit">Submit</button>
+    </form>
   </body>
 </html>
