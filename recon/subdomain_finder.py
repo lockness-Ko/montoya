@@ -7,11 +7,12 @@ import dns.resolver
 
 from bs4 import BeautifulSoup
 from rich.progress import track
+from pathlib import Path
 
 """ Types """
 
 @dataclasses.dataclass
-class Err(BaseException):
+class Err(Exception):
   message: str
 
 """ Request helpers """
@@ -42,10 +43,20 @@ def flat_map(xs: list[list]) -> list:
 def extract_key(key: str, objs: list | map) -> list:
   return list(map(lambda x: x[key], objs))
 
-""" URL helpers """
+""" Processing helpers """
 
 def extract_subdomain(url: str):
   return url.split("://")[-1].split("/")[0].split("@")[-1].split(":")[0]
+
+def clean_results(subdomains, domain: str):
+  ending = domain
+  if not domain.startswith("."):
+    ending = f".{ending}"
+  subdomains = list(filter(lambda x: x.endswith(ending), subdomains))
+  subdomains = [subdomain.replace("*.", "") for subdomain in subdomains]
+  if domain in subdomains:
+    subdomains.remove(domain)
+  return unique(subdomains)
 
 """ Services """
 
@@ -54,19 +65,19 @@ def check_alienvault(domain: str):
   if response.status_code == 400:
     return []
   subdomains = unique(extract_key("hostname", response.json()["passive_dns"]))
-  return subdomains
+  return clean_results(subdomains, domain)
 
 def check_certspotter(domain: str):
   response = get(f"https://api.certspotter.com/v1/issuances?domain={domain}&include_subdomains=true&expand=dns_names", [200, 403])
   if response.status_code == 403:
     return []
-  subdomains = unique(flat_map(extract_key("dns_names", response.json())))
-  return subdomains
+  subdomains = flat_map(extract_key("dns_names", response.json()))
+  return clean_results(subdomains, domain)
 
 def check_crtsh(domain: str):
   response = get(f"https://crt.sh/?q=%.{domain}&output=json")
-  subdomains = unique(extract_key("name_value", response.json()))
-  return subdomains
+  subdomains = extract_key("name_value", response.json())
+  return clean_results(subdomains, domain)
 
 def check_hackertarget(domain: str):
   response = get(f"https://api.hackertarget.com/hostsearch/?q={domain}")
@@ -76,7 +87,7 @@ def check_hackertarget(domain: str):
   if "" in lines:
     lines.remove("")
   subdomains = list(map(lambda x: x.split(",")[0], lines))
-  return subdomains
+  return clean_results(subdomains, domain)
 
 def check_rapiddns(domain: str):
   response = get(f"https://rapiddns.io/subdomain/{domain}")
@@ -90,39 +101,38 @@ def check_rapiddns(domain: str):
       break
     subdomains.append(cell.text)
     row = row.find_next("tr")
-  return unique(subdomains)
+  return clean_results(subdomains, domain)
 
 def check_threatminer(domain: str):
   response = get(f"https://api.threatminer.org/v2/domain.php?q={domain}&rt=5", [200, 404])
   if response == 404:
     return []
-  return response.json()["results"]
+  subdomains = response.json()["results"]
+  return clean_results(subdomains, domain)
 
 def check_urlscan(domain: str):
   response = get(f"https://urlscan.io/api/v1/search?q={domain}")
   urls = extract_key("url", extract_key("page", response.json()["results"]))
   urls = list(filter(lambda x: domain in x, urls))
-  subdomains = unique(map(extract_subdomain, urls))
-  if domain in subdomains:
-    subdomains.remove(domain)
-  return subdomains
+  subdomains = map(extract_subdomain, urls)
+  return clean_results(subdomains, domain)
 
 def check_webarchive(domain: str):
   response = get(f"https://web.archive.org/cdx/search/cdx?url=*.{domain}/*&output=text&fl=original&collapse=urlkey")
   urls = response.text.split("\n")
-  subdomains = unique(map(extract_subdomain, urls))
-  subdomains = list(filter(lambda x: domain in x, subdomains))
+  subdomains = list(map(extract_subdomain, urls))
   if domain in subdomains:
     subdomains.remove(domain)
   if "" in subdomains:
     subdomains.remove("")
-  return subdomains
+  return clean_results(subdomains, domain)
 
 def check_bruteforce(domain: str):
   resolver = dns.resolver.Resolver()
-  resolver.timeout = 0.5
+  resolver.timeout = 0.5 # type: ignore
 
-  with open("common_subdomains.txt", "r") as subdomain_file:
+  path = Path(__file__).with_name("common_subdomains.txt")
+  with path.open("r") as subdomain_file:
     subdomain_list = [subdomain.strip() for subdomain in subdomain_file.read().split()]
 
   types = ["A", "AAAA", "CNAME", "DNSKEY", "MX", "TXT"]
@@ -147,7 +157,7 @@ def check_bruteforce(domain: str):
 
   return subdomains
 
-services = [
+default_services = [
   ("otx.alienvault.com", check_alienvault),
   ("api.certspotter.com", check_certspotter),
   ("crt.sh", check_crtsh),
@@ -157,6 +167,32 @@ services = [
   ("urlscan.io", check_urlscan),
   ("web.archive.org", check_webarchive)
 ]
+
+""" API """
+
+def find_subdomains(domain: str, services, log = None):
+  if log == None:
+    log = lambda x: print(f"  [*] {x}")
+
+  subdomains: set[str] = set()
+
+  for (name, service) in services:
+    try:
+      if name == "bruteforce":
+        log(f"Bruteforcing to search for missed subdomains")
+      else:
+        log(f"Searching '{name}'")
+      count_before = len(subdomains)
+      subdomains.update(service(domain))
+      count_after = len(subdomains)
+      count = count_after - count_before
+      log(f"Found {count} new subdomains")
+    except KeyboardInterrupt:
+      exit(1)
+    except Exception:
+      log(f"Failed to search '{name}'")
+
+  return list(subdomains)
 
 """ Main """
 
@@ -172,6 +208,7 @@ if __name__ == "__main__":
   include_domain = args.include_domain
   output_dir = args.output_dir
 
+  services = list(default_services)
   if args.bruteforce:
     services.append(("bruteforce", check_bruteforce))
 
@@ -185,30 +222,13 @@ if __name__ == "__main__":
   sub_count = 0
   for domain in domains:
     print(f"[*] Searching for subdomains of '{domain}'")
-    subdomains = set()
+    subdomains = set(find_subdomains(domain, services))
     if include_domain:
       subdomains.add(domain)
-
-    for (name, service) in services:
-      try:
-        if name == "bruteforce":
-          print(f"  [*] Bruteforcing to search for missed subdomains")
-        else:
-          print(f"  [*] Searching '{name}'")
-        count_before = len(subdomains)
-        subdomains.update(service(domain))
-        count_after = len(subdomains)
-        count = count_after - count_before
-        print(f"  [*] Found {count} new subdomains")
-      except KeyboardInterrupt as e:
-        exit(1)
-      except Exception as e:
-        print(f"  [-] Failed to search '{name}'")
-
     count = len(subdomains)
-
     sub_count += count
     print()
+
     if output_dir == None:
       print(f"  Found {count} subdomains for {domain}:")
       print("  - " + "\n  - ".join(subdomains))
@@ -217,7 +237,6 @@ if __name__ == "__main__":
       print(f"  Saved {count} subdomains to '{output_file}'")
       with open(output_file, "w") as f:
         f.write("\n".join(subdomains))
-
     print()
 
   count = len(domains)

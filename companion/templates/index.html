@@ -1,0 +1,97 @@
+<div id="content">
+  <h2>Find subdomains</h2>
+  <form id="form">
+    <input id="domain-field" type="text" name="domain" placeholder="Domain" />
+    <button type="submit">Search</button>
+  </form>
+  <div id="progress"></div>
+  <div id="results"></div>
+</div>
+
+<style>
+  :root {
+    font-family: sans-serif;
+  }
+
+  form {
+    position: relative;
+    width: 100%;
+  }
+
+  input,
+  button {
+    display: block;
+    padding: 0.8em;
+    border: none;
+    border-radius: 6px;
+    border: 2px solid black;
+    margin: 0;
+  }
+
+  #content {
+    margin: auto;
+    margin-top: 2em;
+    width: 400px;
+    max-width: calc(100vw - 2em);
+  }
+
+  h2 {
+    margin: 0;
+    margin-bottom: 0.3em;
+  }
+
+  input {
+    width: 76%;
+    margin-bottom: 0.7em;
+    left: 0;
+  }
+
+  button {
+    width: 22%;
+    color: white;
+    background: black;
+    right: 0;
+    top: 0;
+    position: absolute;
+  }
+
+  #progress {
+    margin-bottom: 1em;
+  }
+</style>
+
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
+  integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
+  crossorigin="anonymous"
+></script>
+<script type="text/javascript" charset="utf-8">
+  var socket = io();
+
+  document.getElementById("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    var input = document.getElementById("domain-field");
+    progress.innerHTML = "<h2>Progress</h2>";
+    results.innerHTML = "<h2>Results</h2><p>Waiting for results</p>";
+    socket.emit("find-subdomains", { domain: input.value });
+  });
+
+  var progress = document.getElementById("progress");
+  var results = document.getElementById("results");
+
+  socket.on("find-subdomains_progress", (message) => {
+    progress.innerHTML += message + "<br/>"
+  });
+
+  socket.on("find-subdomains_error", (message) => {
+    progress.innerHTML += message + "<br/>"
+  });
+
+  socket.on("find-subdomains_result", (subdomains) => {
+    results.innerHTML = "<h2>Results (" + subdomains.length + ")</h2>";
+    for (var i = 0; i < subdomains.length; i++) {
+      results.innerHTML += subdomains[i] + "<br/>";
+    }
+  });
+</script>
