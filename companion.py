@@ -3,11 +3,16 @@ import os
 from recon.subdomain_finder import check_bruteforce, find_subdomains, default_services
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
+from flask_cors import CORS
 
 templates_dir = os.path.abspath("companion/templates")
-app = Flask(__name__, template_folder=templates_dir)
+static_dir = os.path.abspath("companion/static")
+
+app = Flask(__name__, template_folder=templates_dir, static_folder=static_dir)
+
 app.config["SECRET_KEY"] = "i'm a security researcher so it's impossible to hack me"
 socketio = SocketIO(app)
+CORS(app)
 
 @app.route("/")
 def index():

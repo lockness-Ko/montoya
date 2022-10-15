@@ -3,6 +3,10 @@
   "name": "Hacking helper",
   "version": "0.0.1",
   "description": "Helps you search for bugs in websites more efficiently.",
+  "browser_action": {
+    "default_title": "Find subdomains",
+    "default_popup": "popup/find_subdomains.html"
+  },
   "content_scripts": [
     {
       "matches": ["https://*/*"],
@@ -12,5 +16,9 @@
       "matches": ["http://*/*"],
       "js": ["harness.js"]
     }
+  ],
+  "permissions": [
+    "http://localhost:1377/*",
+    "https://cdnjs.cloudflare.com/*"
   ]
 }
