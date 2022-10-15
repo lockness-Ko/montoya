@@ -1,7 +1,8 @@
+<!DOCTYPE html>
 <div id="content">
   <h2>Find subdomains</h2>
   <div id="form">
-    <input id="domain-field" type="text" name="domain" placeholder="Domain" />
+    <input autofocus spellcheck="false" autocomplete="off" id="domain-field" type="text" name="domain" placeholder="Domain" />
     <button id="submit">Search</button>
   </div>
   <div id="progress"></div>
@@ -13,9 +14,13 @@
     font-family: sans-serif;
   }
 
+  *, *:before, *:after {
+    box-sizing: border-box;
+  }
+
   html {
-    margin-left: calc(100vw - 100%);
-    margin-right: 0;
+    overflow-x: hidden;
+    margin-right: calc(-1 * (100vw - 100%));
   }
 
   #form {
@@ -24,20 +29,22 @@
   }
 
   input,
-  button {
+  button,
+  .button {
     display: block;
     padding: 0.8em;
-    border: none;
     border-radius: 6px;
     border: 2px solid black;
     margin: 0;
+    font-weight: 400;
+    font-size: 13px;
   }
 
   #content {
     margin: auto;
     margin-top: 2em;
     width: 400px;
-    max-width: calc(100vw - 2em);
+    max-width: calc(100vw - 2.5em);
   }
 
   h2 {
@@ -47,15 +54,17 @@
   }
 
   input {
-    width: 76%;
+    width: calc(100% - 95px);
     margin-bottom: 0.7em;
     left: 0;
   }
 
-  button {
-    width: 22%;
+  button, .button {
+    width: 90px;
     color: white;
     background: black;
+    text-decoration: none;
+    text-align: center;
   }
 
   #submit {
@@ -66,6 +75,7 @@
 
   #progress {
     margin-bottom: 1em;
+    margin-top: 1em;
   }
 
   #save {

@@ -148,8 +148,10 @@ def check_bruteforce(domain: str):
         break
     except dns.resolver.NXDOMAIN:
       pass
-    except dns.resolver.NoAnswer: # doesn't work for cloudflare domains
-      subdomains.append(subdomain)
+    except dns.resolver.NoAnswer:
+      # Doesn't work for cloudflare domains because cloudflare doesn't follow the spec
+      # subdomains.append(subdomain)
+      pass
     except KeyboardInterrupt:
       exit(1)
     except:

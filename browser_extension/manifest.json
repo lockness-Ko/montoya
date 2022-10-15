@@ -19,6 +19,6 @@
   ],
   "permissions": [
     "http://localhost:1377/*",
-    "https://cdnjs.cloudflare.com/*"
+    "activeTab"
   ]
 }
