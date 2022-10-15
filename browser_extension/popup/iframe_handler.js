@@ -9,7 +9,7 @@ document.onreadystatechange = function () {
     fetch(frame.src)
       .catch(() => {
         target.innerHTML = `ERROR: Failed to load companion, are you sure that it's running?
-<style>#target { padding: 2em; box-sizing: border-box; }</style>`;
+<style>#target { padding: 2em }</style>`;
       });
   }
 };
